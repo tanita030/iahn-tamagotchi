@@ -105,7 +105,7 @@ function petCat(){
   wrap.classList.add('hidden-cat');
   setFace('cat','¡Mira quién está aquí! 🐱','anim-pop',['❤️','🐱']);
   change({mood:10}); state.points+=2; render();
-  toast('Acariciando al gato 🐱❤️');
+  toast('Acariciando al gato 🐱❤️');logActivity('action','ha acariciado al gato 🐱','🐱');
   catPetTimer=setTimeout(()=>{
     wrap.classList.remove('hidden-cat');
     showCatFrame();
@@ -160,7 +160,7 @@ function buyRoomItem(id){
   if(!spend(item.cost))return false;
   state.roomItems.push(id);save();renderRoomItems();
   if(id==='cat')startCatAnimation();
-  playSfx('yay');toast(`${item.name} comprado para siempre ${item.emoji}`);return true;
+  playSfx('yay');toast(`${item.name} comprado para siempre ${item.emoji}`);logActivity('action',`ha comprado ${item.name}`,'🛍️');return true;
 }
 function shopMenu(){
   const cards=Object.entries(ROOM_ITEMS).map(([id,item])=>{
@@ -180,7 +180,7 @@ function render(){
   $('#points').textContent=state.points;
   for(const k of ['mood','hunger','energy','health']){$('#'+k+'Value').textContent=Math.round(state[k])+'%';$('#'+k+'Bar').style.width=state[k]+'%'}
 }
-function say(text){$('#speech').textContent=text}
+function say(text){$('#speech').textContent=text;const clean=String(text||'').trim();const now=Date.now();if(clean&&firebaseReady&&state.username&&(clean!==lastIahnActivity||now-lastIahnActivityAt>8000)){lastIahnActivity=clean;lastIahnActivityAt=now;logActivity('iahn',clean,'💬')}}
 function toast(text){const t=$('#toast');t.textContent=text;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
 function change(delta){for(const[k,v]of Object.entries(delta))state[k]=clamp(state[k]+v);render()}
 function setFace(key,phrase,anim='anim-pop',effects=[]){
@@ -322,15 +322,22 @@ function miniGame(type){
   window.addEventListener('keyup',onKeyUp);
 
   function controlsFor(list){
-    controls.innerHTML=list.map(([k,label])=>`<button data-key="${k}">${label}</button>`).join('');
+    const icon={left:'◀',right:'▶',up:'▲',shoot:'●'};
+    controls.className='game-controls touch-gamepad '+(list.length===1?'single-control':'');
+    controls.innerHTML=list.map(([k,label])=>{
+      const short=icon[k]||label;
+      const full=label.includes(' ')?label:short;
+      return `<button class="game-pad-btn pad-${k}" data-key="${k}" type="button" aria-label="${label}"><span>${short}</span><small>${full}</small></button>`;
+    }).join('');
     controls.querySelectorAll('button').forEach(b=>{
       const k=b.dataset.key;
-      const down=e=>{e.preventDefault();keys[k]=true};
-      const up=e=>{e.preventDefault();keys[k]=false};
+      const down=e=>{e.preventDefault();b.classList.add('pressed');keys[k]=true;if(b.setPointerCapture){try{b.setPointerCapture(e.pointerId)}catch(_){}}};
+      const up=e=>{e.preventDefault();b.classList.remove('pressed');keys[k]=false};
       b.addEventListener('pointerdown',down);
       b.addEventListener('pointerup',up);
       b.addEventListener('pointercancel',up);
-      b.addEventListener('pointerleave',up);
+      b.addEventListener('lostpointercapture',up);
+      b.addEventListener('contextmenu',e=>e.preventDefault());
     });
   }
   $('#gameBack').onclick=()=>{cleanup();playMenu()};
@@ -380,8 +387,8 @@ function miniGame(type){
   }
 
   if(type==='platform'){
-    help.textContent='← → mover · ▲ / ESPACIO saltar. Llega a la ⭐. 16 plataformas + monedas.';
-    controlsFor([['left','◀'],['up','▲'],['right','▶']]);
+    help.textContent='← → mover. Iahn salta automáticamente. Llega a la ⭐. 16 plataformas + monedas.';
+    controlsFor([['left','◀'],['right','▶']]);
 
     const ps=[
       [15,0,105],[155,65,90],[45,130,100],[210,195,95],[320,260,90],
@@ -416,21 +423,18 @@ function miniGame(type){
       player.x=Math.max(0,Math.min(area.clientWidth-player.w,player.x));
 
       if(player.onGround)coyote=.11;else coyote=Math.max(0,coyote-dt);
-      if(keys.up){jumpBuffer=.12;keys.up=false}else jumpBuffer=Math.max(0,jumpBuffer-dt);
-      if(jumpBuffer>0&&coyote>0){
-        player.vy=470;player.onGround=false;coyote=0;jumpBuffer=0;playSfx('jump');
-      }
-      if(player.vy>0)player.vy-=180*dt;
 
       player.onGround=false;
       for(const p of ps){
         if(player.vy<=0 &&
           player.x+player.w>p.x && player.x<p.x+p.w &&
           prevY>=p.y+p.h-1 && player.y<=p.y+p.h+2){
-          player.y=p.y+p.h;player.vy=0;player.onGround=true;
+          player.y=p.y+p.h;player.vy=470;player.onGround=true;
+          playSfx('jump');
           if(p.y>highest){highest=p.y;scoreAdd(5)}
         }
       }
+      if(player.vy>0)player.vy-=180*dt;
       for(const c of coins){
         if(!c.got&&overlap({x:player.x,y:player.y,w:player.w,h:player.h},c)){
           c.got=true;c.el.remove();scoreAdd(10);playSfx('coin');
@@ -495,8 +499,8 @@ function miniGame(type){
   }
 
   if(type==='cells'){
-    help.textContent='← → mover · ● / ENTER disparar. Destruye 18 células en oleadas.';
-    controlsFor([['left','◀'],['shoot','●'],['right','▶']]);
+    help.textContent='← → mover. Iahn dispara automáticamente. Destruye 18 células en oleadas.';
+    controlsFor([['left','◀'],['right','▶']]);
 
     const player={x:45,y:32,w:38,h:48,el:addIahn(45,32)};
     let enemies=[],shots=[],lastSpawn=0,lastShot=0,kills=0,wave=1;
@@ -525,7 +529,7 @@ function miniGame(type){
       const cellDir=keys.right?-1:1;
       updateIahn(player.el, (keys.left||keys.right) ? 'run' : 'idle', t, cellDir);
       pos(player.el,player.x,player.y);
-      if(keys.shoot)shoot();
+      shoot();
       if(t-lastSpawn>Math.max(350,750-wave*35)){lastSpawn=t;spawn();if(Math.random()<wave*.025)spawn()}
 
       shots.forEach(b=>{b.y+=b.vy*dt;pos(b.el,b.x,b.y)});
@@ -590,21 +594,25 @@ function miniGame(type){
   }
 }
 
-async function chatMenu(friendUid=null, friendName=''){
-  if(!firebaseReady){body.innerHTML='<div class="feed-item">🔴 Firebase no está conectado todavía.</div><p><small>Recarga la página e inténtalo de nuevo.</small></p>';return;}
-  const friends=await getFriends();
-  if(!friends.length){
-    body.innerHTML='<div class="feed-item">👥 Todavía no tienes amigos.</div><p><small>Ve a 👥 Amigos para buscar a alguien por su nombre de usuario.</small></p>';return;
-  }
-  const selected=friendUid?friends.find(f=>f.uid===friendUid):friends[0];
-  if(!selected){friendUid=friends[0].uid;friendName=friends[0].username;}
-  friendUid=friendUid||selected.uid; friendName=friendName||selected.username;
-  const list=friends.map(f=>`<button class="menu-item chat-friend-select ${f.uid===friendUid?'selected':''}" data-chat-uid="${escapeHtml(f.uid)}" data-chat-name="${escapeHtml(f.username)}"><span class="emoji">💬</span>${escapeHtml(f.username)}<small>Abrir chat</small></button>`).join('');
-  body.innerHTML=`<div class="chat-layout"><div class="chat-friends"><strong>AMIGOS</strong><div class="chat-friend-list">${list}</div></div><div class="chat-panel"><div class="chat-title">💬 ${escapeHtml(friendName)}</div><div id="chatMessages" class="chat-messages"><div class="feed-item">Cargando mensajes...</div></div><form id="chatForm" class="chat-form"><input id="chatInput" maxlength=300 autocomplete="off" placeholder="Escribe un mensaje..." required><button class="primary" type="submit">➤</button></form></div></div>`;
-  body.querySelectorAll('[data-chat-uid]').forEach(b=>b.addEventListener('click',()=>chatMenu(b.dataset.chatUid,b.dataset.chatName)));
-  const form=$('#chatForm'), input=$('#chatInput');
-  form.addEventListener('submit',async e=>{e.preventDefault();const text=String(input.value||'').trim();if(!text)return;input.disabled=true;try{await sendChatMessage(friendUid,text);input.value='';}catch(err){console.warn(err);toast('No se pudo enviar el mensaje.');}input.disabled=false;input.focus();});
-  subscribeToChat(friendUid);
+async function chatMenu(){
+  if(!firebaseReady){body.innerHTML='<div class="feed-item">🔴 Firebase no está conectado todavía.</div>';return;}
+  body.innerHTML=`<div class="social-feed-wrap">
+    <div class="social-feed-head"><div><strong>💬 ACTIVIDAD</strong><small>Lo que está pasando en IAHN ahora mismo</small></div><span class="live-dot">● EN DIRECTO</span></div>
+    <div id="activityMessages" class="activity-messages"><div class="social-note">Cargando actividad...</div></div>
+    <form id="activityForm" class="chat-form activity-form"><input id="activityInput" maxlength="300" autocomplete="off" placeholder="Escribe un mensaje..." required><button class="primary" type="submit">➤</button></form>
+  </div>`;
+  subscribeToActivityFeed();
+  const form=$('#activityForm'),input=$('#activityInput');
+  form.addEventListener('submit',async e=>{e.preventDefault();const text=String(input.value||'').trim();if(!text)return;input.disabled=true;try{await sendActivityMessage(text);input.value='';}catch(err){console.warn(err);toast('No se pudo enviar el mensaje.');}input.disabled=false;input.focus();});
+}
+function galleryMenu(){body.innerHTML=`<p>Fotos desbloqueadas: ${state.photos.length}</p><div class="gallery">${state.photos.map((src,i)=>`<img src="${src}" alt="Recuerdo ${i+1}">`).join('')||'<p>Aún no hay fotos.</p>'}</div>`}
+async function friendsMenu(){
+  if(!firebaseReady){body.innerHTML='<div class="feed-item">🔴 Firebase no está conectado.</div>';return;}
+  body.innerHTML=`<div class="online-wrap">
+    <div class="social-feed-head"><div><strong>👥 GENTE CONECTADA</strong><small>Somos pocos: aquí aparecen quienes están usando IAHN ahora mismo.</small></div><span class="live-dot">● EN DIRECTO</span></div>
+    <div id="onlineUsers" class="online-users"><div class="social-note">Buscando gente conectada...</div></div>
+  </div>`;
+  renderOnlineUsers();
 }
 function galleryMenu(){body.innerHTML=`<p>Fotos desbloqueadas: ${state.photos.length}</p><div class="gallery">${state.photos.map((src,i)=>`<img src="${src}" alt="Recuerdo ${i+1}">`).join('')||'<p>Aún no hay fotos.</p>'}</div>`}
 function achievementsMenu(){const a=[['🍕','Primera comida',state.hunger>62],['😂','Primer meme',state.photos.length>0],['⭐','100 puntos',state.points>=100],['🫂','Cariño recibido',state.mood>78],['🎮','Jugar',state.points>0]];body.innerHTML=a.map(x=>`<div class="feed-item"><span style="font-size:26px">${x[0]}</span><div><strong>${x[1]}</strong><br><small>${x[2]?'✓ Desbloqueado':'🔒 Bloqueado'}</small></div></div>`).join('')}
@@ -692,89 +700,67 @@ async function syncGlobalDelta(delta){
 }
 
 // ==========================================================
-// AMIGOS + CHAT — FIRESTORE EN TIEMPO REAL
+// V38 — ACTIVIDAD GLOBAL + PRESENCIA EN TIEMPO REAL
 // ==========================================================
 let chatUnsubscribe=null;
-function escapeHtml(v){return String(v??'').replace(/[&<>\"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[ch]));}
+let presenceUnsubscribe=null;
+let presenceTimer=null;
+let lastIahnActivity='';
+let lastIahnActivityAt=0;
+function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 function normalizeUsername(v){return String(v||'').trim().toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9._-]/g,'').slice(0,20);}
-function chatIdFor(a,b){return [a,b].sort().join('__');}
-function friendshipIdFor(a,b){return chatIdFor(a,b);}
-async function registerUsernameIndex(){
-  if(!firebaseReady||!firebaseUid||!state.username)return;
-  const key=normalizeUsername(state.username); if(!key)return;
-  const ref=firebaseDb.collection('usernames').doc(key);
-  const snap=await ref.get();
-  if(!snap.exists){await ref.set({uid:firebaseUid,username:state.username,createdAt:firebase.firestore.FieldValue.serverTimestamp()});return true;}
-  const d=snap.data()||{};
-  if(d.uid===firebaseUid)return true;
-  console.warn('Nombre de usuario ocupado:',state.username);return false;
+async function logActivity(type,text,emoji='✨'){
+  if(!firebaseReady||!firebaseUid||!state.username||!text)return;
+  try{
+    await firebaseDb.collection('activityFeed').add({uid:firebaseUid,username:state.username,type,text:String(text).slice(0,300),emoji,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+  }catch(e){console.warn('Activity log:',e)}
 }
-async function getFriends(){
-  if(!firebaseReady||!firebaseUid)return [];
-  const snap=await firebaseDb.collection('friendships').where('users','array-contains',firebaseUid).get();
-  const out=[];
-  for(const doc of snap.docs){const d=doc.data()||{};const other=(d.users||[]).find(x=>x!==firebaseUid);if(!other)continue;const names=d.names||{};out.push({uid:other,username:names[other]||'Usuario'});}
-  return out;
+async function sendActivityMessage(text){
+  const clean=String(text||'').trim().slice(0,300);if(!clean) return;
+  await logActivity('message',clean,'💬');
 }
-async function getFriendshipBetween(a,b){
-  if(!firebaseReady||!firebaseUid)return null;
-  // La consulta usa el índice de amistades del usuario actual. Así no intentamos
-  // leer directamente un documento inexistente, algo que las reglas pueden rechazar.
-  const snap=await firebaseDb.collection('friendships').where('users','array-contains',firebaseUid).get();
-  return snap.docs.find(d=>{const users=d.data()?.users||[];return users.includes(a)&&users.includes(b)})||null;
-}
-async function getPendingBetween(a,b){
-  // Solo consultamos solicitudes que el usuario actual puede leer según las reglas.
-  const [outgoing,incoming]=await Promise.all([
-    firebaseDb.collection('friendRequests').where('fromUid','==',a).get(),
-    firebaseDb.collection('friendRequests').where('toUid','==',a).get()
-  ]);
-  const aReq=outgoing.docs.find(d=>{const x=d.data()||{};return x.toUid===b&&x.status==='pending';});
-  const bReq=incoming.docs.find(d=>{const x=d.data()||{};return x.fromUid===b&&x.status==='pending';});
-  return aReq||bReq||null;
-}
-async function getFriendRequests(direction){
-  if(!firebaseReady||!firebaseUid)return [];
-  const field=direction==='incoming'?'toUid':'fromUid';
-  const snap=await firebaseDb.collection('friendRequests').where(field,'==',firebaseUid).get();
-  return snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.status==='pending');
-}
-async function sendFriendRequest(toUid,toName){
-  if(toUid===firebaseUid)throw new Error('self');
-  if(await getFriendshipBetween(firebaseUid,toUid))throw new Error('already-friends');
-  if(await getPendingBetween(firebaseUid,toUid))throw new Error('pending');
-  await firebaseDb.collection('friendRequests').add({fromUid:firebaseUid,fromName:state.username||'Usuario',toUid,toName,status:'pending',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
-}
-async function acceptFriendRequest(id){
-  const ref=firebaseDb.collection('friendRequests').doc(id), snap=await ref.get(); if(!snap.exists)throw new Error('missing');
-  const d=snap.data()||{}; if(d.toUid!==firebaseUid)throw new Error('not-authorized');
-  const batch=firebaseDb.batch();
-  batch.set(firebaseDb.collection('friendships').doc(friendshipIdFor(d.fromUid,d.toUid)),{users:[d.fromUid,d.toUid],names:{[d.fromUid]:d.fromName||'Usuario',[d.toUid]:d.toName||state.username||'Usuario'},createdAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-  batch.update(ref,{status:'accepted',acceptedAt:firebase.firestore.FieldValue.serverTimestamp()});
-  await batch.commit();
-}
-async function rejectFriendRequest(id){const ref=firebaseDb.collection('friendRequests').doc(id),snap=await ref.get();if(!snap.exists)throw new Error('missing');const d=snap.data()||{};if(d.toUid!==firebaseUid)throw new Error('not-authorized');await ref.update({status:'rejected',rejectedAt:firebase.firestore.FieldValue.serverTimestamp()});}
-async function sendChatMessage(friendUid,text){
-  if(!firebaseReady||!firebaseUid)throw new Error('not-ready');
-  const friendship=await getFriendshipBetween(firebaseUid,friendUid);if(!friendship)throw new Error('not-friends');
-  const chatRef=firebaseDb.collection('chats').doc(chatIdFor(firebaseUid,friendUid));
-  const clean=text.trim().slice(0,300); if(!clean)return;
-  const batch=firebaseDb.batch();
-  batch.set(chatRef,{participants:[firebaseUid,friendUid],lastMessage:clean,lastSender:firebaseUid,lastSenderName:state.username||'Usuario',updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
-  batch.set(chatRef.collection('messages').doc(),{senderUid:firebaseUid,senderName:state.username||'Usuario',text:clean,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
-  await batch.commit();
-}
-function subscribeToChat(friendUid){
+function subscribeToActivityFeed(){
   if(chatUnsubscribe){chatUnsubscribe();chatUnsubscribe=null;}
-  if(!firebaseReady||!firebaseUid)return;
-  const chatRef=firebaseDb.collection('chats').doc(chatIdFor(firebaseUid,friendUid));
-  chatUnsubscribe=chatRef.collection('messages').orderBy('createdAt','asc').limitToLast(100).onSnapshot(snap=>{
-    const el=$('#chatMessages');if(!el)return;
-    if(snap.empty){el.innerHTML='<div class="social-note">No hay mensajes todavía. ¡Di hola! 👋</div>';return;}
-    el.innerHTML=snap.docs.map(d=>{const m=d.data()||{};const mine=m.senderUid===firebaseUid;return `<div class="chat-bubble ${mine?'mine':''}"><strong>${escapeHtml(m.senderName||'Usuario')}</strong><span>${escapeHtml(m.text||'')}</span><small>${m.createdAt?.toDate?m.createdAt.toDate().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):''}</small></div>`}).join('');
+  if(!firebaseReady)return;
+  chatUnsubscribe=firebaseDb.collection('activityFeed').orderBy('createdAt','asc').limitToLast(100).onSnapshot(snap=>{
+    const el=$('#activityMessages');if(!el)return;
+    if(snap.empty){el.innerHTML='<div class="social-note">Todavía no ha pasado nada. ¡Escribe el primer mensaje! 👋</div>';return;}
+    el.innerHTML=snap.docs.map(doc=>{
+      const d=doc.data()||{}, type=d.type||'action';
+      const time=d.createdAt?.toDate?d.createdAt.toDate().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'';
+      if(type==='iahn') return `<div class="activity-row iahn-row"><div class="activity-icon">🧑‍🎤</div><div class="activity-content"><strong>IAHN <span>dice:</span></strong><div class="activity-text">${escapeHtml(d.text||'')}</div><small>${time}</small></div></div>`;
+      if(type==='message') return `<div class="activity-row message-row ${d.uid===firebaseUid?'mine':''}"><div class="activity-icon">💬</div><div class="activity-content"><strong>${escapeHtml(d.username||'Usuario')}</strong><div class="activity-text">${escapeHtml(d.text||'')}</div><small>${time}</small></div></div>`;
+      return `<div class="activity-row action-row"><div class="activity-icon">${escapeHtml(d.emoji||'✨')}</div><div class="activity-content"><strong>${escapeHtml(d.username||'Usuario')}</strong><div class="activity-text">${escapeHtml(d.text||'')}</div><small>${time}</small></div></div>`;
+    }).join('');
     el.scrollTop=el.scrollHeight;
-  },e=>{console.warn('Chat listener:',e);const el=$('#chatMessages');if(el)el.innerHTML='<div class="social-note">❌ No se pudieron cargar los mensajes.</div>';});
+  },e=>{console.warn('Activity listener:',e);const el=$('#activityMessages');if(el)el.innerHTML='<div class="social-note">❌ No se pudo cargar la actividad.</div>';});
 }
+async function updatePresence(){
+  if(!firebaseReady||!firebaseUid||!state.username)return;
+  try{await firebaseDb.collection('presence').doc(firebaseUid).set({uid:firebaseUid,username:state.username,lastSeen:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});}
+  catch(e){console.warn('Presence:',e)}
+}
+function startPresence(){
+  if(presenceTimer)clearInterval(presenceTimer);
+  updatePresence();
+  presenceTimer=setInterval(updatePresence,30000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)updatePresence();});
+  window.addEventListener('beforeunload',()=>{updatePresence();});
+}
+function renderOnlineUsers(){
+  const el=$('#onlineUsers');if(!el||!firebaseReady)return;
+  if(presenceUnsubscribe){presenceUnsubscribe();presenceUnsubscribe=null;}
+  presenceUnsubscribe=firebaseDb.collection('presence').onSnapshot(snap=>{
+    const now=Date.now();
+    const users=snap.docs.map(doc=>doc.data()||{}).filter(d=>d.uid&&d.username).map(d=>{
+      const ts=d.lastSeen?.toDate?d.lastSeen.toDate().getTime():0;
+      return {...d,online:d.uid===firebaseUid || (ts>0 && now-ts<75000)};
+    }).filter(d=>d.online).sort((a,b)=>a.uid===firebaseUid?-1:b.uid===firebaseUid?1:String(a.username).localeCompare(String(b.username),'es'));
+    if(!users.length){el.innerHTML='<div class="social-note">Nadie aparece conectado todavía.</div>';return;}
+    el.innerHTML=`<div class="online-count">🟢 ${users.length} ${users.length===1?'persona':'personas'} conectadas</div>`+users.map(u=>`<div class="online-user"><span class="online-avatar">${u.uid===firebaseUid?'⭐':'👤'}</span><div><strong>${escapeHtml(u.username)}</strong><small>${u.uid===firebaseUid?'Eres tú':'Conectado ahora'}</small></div><span class="online-status">●</span></div>`).join('');
+  },e=>{console.warn('Presence listener:',e);el.innerHTML='<div class="social-note">❌ No se pudo cargar la lista.</div>';});
+}
+
 async function initFirebaseSync(){
   if(!hasFirebaseConfig())return;
   try{
@@ -820,6 +806,7 @@ async function initFirebaseSync(){
       render();
     });
     if(state.username) await registerUsernameIndex().catch(e=>console.warn('Username index:',e));
+    if(state.username) startPresence();
     console.info('Firebase conectado. Usuario:',firebaseUid);
   }catch(e){
     firebaseReady=false;
@@ -838,6 +825,8 @@ async function saveUsername(username){
       const key=normalizeUsername(clean); const ref=firebaseDb.collection('usernames').doc(key); const snap=await ref.get();
       if(snap.exists && snap.data()?.uid!==firebaseUid){state.username=localStorage.getItem('iahnUsername')||'';throw new Error('username-taken');}
       await ref.set({uid:firebaseUid,username:clean,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      await updatePresence();
+      await logActivity('action',`ha entrado en IAHN 👋`,'👋');
     }catch(e){
       console.warn('Firebase username save:',e);
       return false;
@@ -902,7 +891,7 @@ function foodMenu(){
     change({hunger,energy,health,mood:3});
     playSfx('eat');
     setFace(name==='Pizza'?'eat':(health>=3?'happy':'eat'),`Ñam... ${name} 😋`,'anim-bounce',['🍽️','❤️']);
-    toast(`Has comprado ${name} por ${cost} ⭐`);closeModal();
+    toast(`Has comprado ${name} por ${cost} ⭐`);logActivity('action',`ha comido ${name}`,'🍽️');closeModal();
   }));
 }
 
@@ -941,7 +930,7 @@ function careMenu(){
     }
     change({mood:v,energy: name==='Ver una peli'?2:0});
     setFace(face,`${name} ❤️`,'anim-pop',['❤️','💕']);
-    toast(`${name}: -${cost} ⭐`);closeModal();
+    toast(`${name}: -${cost} ⭐`);logActivity('action',`ha hecho: ${name}`,'❤️');closeModal();
   }));
 }
 
@@ -997,7 +986,7 @@ function playMenu(){
   </div>`;
   body.querySelectorAll('[data-game]').forEach(b=>b.addEventListener('click',()=>{
     const costs={platform:8,spikes:7,cells:10,pizza:6};
-    if(spendEnergyForGame(costs[b.dataset.game])) miniGame(b.dataset.game);
+    if(spendEnergyForGame(costs[b.dataset.game])) { logActivity('action',`ha empezado a jugar: ${b.parentElement.querySelector('strong')?.textContent||b.dataset.game}`,'🎮'); miniGame(b.dataset.game); }
   }));
 }
 function spendEnergyForGame(cost){
@@ -1138,6 +1127,22 @@ if(usernameForm)usernameForm.addEventListener('submit',async e=>{
 });
 
 document.addEventListener('click',e=>{const btn=e.target.closest('button');if(btn && btn.id!=='musicToggle' && btn.id!=='startButton')playSfx('click');});
+function applyMobileConsoleScale(){
+  const root=document.documentElement;
+  const w=window.innerWidth||760;
+  if(w<=700){
+    const scale=Math.max(0.42,Math.min(1,(w-8)/760));
+    root.classList.add('mobile-console-mode');
+    root.style.setProperty('--console-zoom',String(scale));
+  }else{
+    root.classList.remove('mobile-console-mode');
+    root.style.removeProperty('--console-zoom');
+  }
+}
+window.addEventListener('resize',applyMobileConsoleScale,{passive:true});
+window.addEventListener('orientationchange',()=>setTimeout(applyMobileConsoleScale,80),{passive:true});
+applyMobileConsoleScale();
+
 render();
 renderRoomItems();
 firebaseInitPromise=initFirebaseSync();
