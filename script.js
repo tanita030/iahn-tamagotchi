@@ -781,6 +781,19 @@ async function registerUsernameIndex(){
   }, {merge:true});
 }
 
+if(typeof registerUsernameIndex !== 'function') {
+  window.registerUsernameIndex = async function(){
+    if(!firebaseReady || !firebaseUid || !state.username) return;
+    const clean=String(state.username).trim().replace(/\s+/g,' ');
+    const key=normalizeUsername(clean);
+    if(!key) return;
+    const ref=firebaseDb.collection('usernames').doc(key);
+    const snap=await ref.get();
+    if(snap.exists && snap.data()?.uid && snap.data().uid!==firebaseUid) throw new Error('username-taken');
+    await ref.set({uid:firebaseUid,username:clean,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+  };
+}
+
 async function initFirebaseSync(){
   if(!hasFirebaseConfig())return;
   try{
@@ -825,11 +838,18 @@ async function initFirebaseSync(){
       applyingRemote=false;
       render();
     });
-    if(state.username) await registerUsernameIndex().catch(e=>console.warn('Username index:',e));
-    if(state.username) startPresence();
+    // El índice de nombres y la presencia son funciones auxiliares. Si una de ellas falla,
+    // NO debemos marcar Firebase como desconectado: la autenticación y Firestore ya funcionan.
+    if(state.username){
+      try{ await registerUsernameIndex(); }
+      catch(e){ console.warn('No se pudo actualizar el índice de usuario (Firebase sigue conectado):',e); }
+      try{ startPresence(); }
+      catch(e){ console.warn('No se pudo iniciar la presencia (Firebase sigue conectado):',e); }
+    }
     console.info('Firebase conectado. Usuario:',firebaseUid);
   }catch(e){
     firebaseReady=false;
+    setFirebaseStatus();
     console.warn('Firebase no disponible; usando modo local.',e);
   }
 }
