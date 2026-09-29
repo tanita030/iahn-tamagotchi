@@ -3,7 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#17151d">
+  <meta name="theme-color" content="#ff4f91">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/pwa/apple-touch-icon.png">
   <title>IAHN — Tamagotchi</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -14,6 +19,26 @@
     <button id="startButton" class="start-button" type="button" aria-label="Start">
       <img src="assets/start/button.png" alt="START">
     </button>
+    <div class="pwa-start-actions" aria-label="Opciones de aplicación">
+      <button id="installAppButton" class="pwa-install-button" type="button" aria-label="Instalar IAHN como aplicación">
+        <img src="assets/pwa/install-button.png" alt="Instalar IAHN">
+      </button>
+      <button id="installHelpButton" class="pwa-help-button" type="button" aria-label="Qué es instalar IAHN">?</button>
+    </div>
+    <div id="installHint" class="pwa-install-hint">INSTALAR IAHN EN EL MÓVIL</div>
+  </div>
+  <div id="installHelpModal" class="install-help-modal hidden" aria-hidden="true">
+    <div class="install-help-box" role="dialog" aria-modal="true" aria-labelledby="installHelpTitle">
+      <button id="installHelpClose" class="install-help-close" type="button" aria-label="Cerrar">×</button>
+      <div class="install-help-icon">📱</div>
+      <h2 id="installHelpTitle">¿QUÉ ES INSTALAR IAHN?</h2>
+      <p>Convierte esta web en una pequeña app en tu móvil. Tendrás un icono de <b>IAHN</b> en la pantalla de inicio y podrás abrir el juego directamente, sin buscar la web cada vez.</p>
+      <div class="install-help-steps">
+        <div><b>🤖 Android</b><br>Si aparece la instalación, pulsa <b>Instalar</b>. Si no aparece, abre el menú de Chrome y elige <b>Instalar aplicación</b> o <b>Añadir a pantalla de inicio</b>.</div>
+        <div><b>🍎 iPhone</b><br>En Safari pulsa <b>Compartir → Añadir a pantalla de inicio → Añadir</b>.</div>
+      </div>
+      <button id="installHelpOk" class="primary install-help-ok" type="button">ENTENDIDO</button>
+    </div>
   </div>
   <div id="usernameScreen" class="username-screen hidden" aria-hidden="true">
     <div class="username-box">
@@ -92,6 +117,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
-<script src="script-v44.js"></script>
+<script src="script-v45.js"></script>
 </body>
 </html>
