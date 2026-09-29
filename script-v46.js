@@ -645,31 +645,73 @@ const FOOD_DATA=[
 // ==========================================================
 let firebaseReady=false, firebaseDb=null, firebaseUid=null, applyingRemote=false;
 let firebaseInitPromise=null;
+// V46.1: reducir escrituras agrupando cambios y evitando guardar datos sin cambios.
 let userSyncTimer=null;
+let lastUserSyncSignature='';
+let pendingGlobalDelta={};
+let globalSyncTimer=null;
+let globalSyncInFlight=false;
 function hasFirebaseConfig(){
   const c=window.FIREBASE_CONFIG;
   return !!(c && c.apiKey && c.projectId && c.appId && window.firebase);
 }
-function scheduleUserSync(){
-  if(!firebaseReady || applyingRemote)return;
+function getUserSyncSignature(){
+  return JSON.stringify({username:state.username||'',stars:Math.floor(state.points),roomItems:[...state.roomItems]});
+}
+function markUserSyncCurrent(){lastUserSyncSignature=getUserSyncSignature();}
+function scheduleUserSync(delay=5000){
+  if(!firebaseReady || applyingRemote || !firebaseUid)return;
+  if(getUserSyncSignature()===lastUserSyncSignature)return;
   clearTimeout(userSyncTimer);
   userSyncTimer=setTimeout(async()=>{
+    userSyncTimer=null;
+    if(!firebaseReady || applyingRemote || !firebaseUid)return;
+    const signature=getUserSyncSignature();
+    if(signature===lastUserSyncSignature)return;
     try{
-      await firebaseDb.collection('users').doc(firebaseUid).set({
-        username:state.username||'', stars:Math.floor(state.points), roomItems:[...state.roomItems], updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-      },{merge:true});
+      const payload=JSON.parse(signature);
+      await firebaseDb.collection('users').doc(firebaseUid).set({...payload,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      lastUserSyncSignature=signature;
     }catch(e){console.warn('Firebase user sync:',e)}
-  },250);
+  },delay);
 }
-async function syncGlobalDelta(delta){
+function queueGlobalDelta(delta){
   if(!firebaseReady || applyingRemote)return;
+  for(const k of ['mood','hunger','energy','health']){
+    if(k in delta){
+      const n=Number(delta[k]);
+      if(Number.isFinite(n) && n!==0)pendingGlobalDelta[k]=(pendingGlobalDelta[k]||0)+n;
+    }
+  }
+  if(!Object.keys(pendingGlobalDelta).length)return;
+  clearTimeout(globalSyncTimer);
+  globalSyncTimer=setTimeout(flushGlobalDelta,15000);
+}
+async function flushGlobalDelta(){
+  globalSyncTimer=null;
+  if(!firebaseReady || applyingRemote || globalSyncInFlight)return;
+  const queued={...pendingGlobalDelta};
+  pendingGlobalDelta={};
   const patch={};
-  for(const k of ['mood','hunger','energy','health']) if(k in delta) patch[k]=firebase.firestore.FieldValue.increment(Number(delta[k]));
+  for(const k of ['mood','hunger','energy','health']){
+    if(Number.isFinite(queued[k]) && queued[k]!==0)patch[k]=firebase.firestore.FieldValue.increment(queued[k]);
+  }
   if(!Object.keys(patch).length)return;
+  globalSyncInFlight=true;
   try{
     await firebaseDb.collection('game').doc('iahn').set({updatedAt:firebase.firestore.FieldValue.serverTimestamp(),...patch},{merge:true});
-  }catch(e){console.warn('Firebase global sync:',e)}
+  }catch(e){
+    for(const k of Object.keys(queued))pendingGlobalDelta[k]=(pendingGlobalDelta[k]||0)+queued[k];
+    console.warn('Firebase global sync:',e);
+  }finally{
+    globalSyncInFlight=false;
+    if(Object.keys(pendingGlobalDelta).length){
+      clearTimeout(globalSyncTimer);
+      globalSyncTimer=setTimeout(flushGlobalDelta,15000);
+    }
+  }
 }
+async function syncGlobalDelta(delta){queueGlobalDelta(delta);}
 
 // ==========================================================
 // V38 — ACTIVIDAD GLOBAL + PRESENCIA EN TIEMPO REAL
@@ -722,7 +764,7 @@ async function updatePresence(){
 function startPresence(){
   if(presenceTimer)clearInterval(presenceTimer);
   updatePresence();
-  presenceTimer=setInterval(updatePresence,30000);
+  presenceTimer=setInterval(updatePresence,120000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)updatePresence();});
   window.addEventListener('beforeunload',()=>{updatePresence();});
 }
@@ -733,7 +775,7 @@ function renderOnlineUsers(){
     const now=Date.now();
     const users=snap.docs.map(doc=>doc.data()||{}).filter(d=>d.uid&&d.username).map(d=>{
       const ts=d.lastSeen?.toDate?d.lastSeen.toDate().getTime():0;
-      return {...d,online:d.uid===firebaseUid || (ts>0 && now-ts<75000)};
+      return {...d,online:d.uid===firebaseUid || (ts>0 && now-ts<300000)};
     }).filter(d=>d.online).sort((a,b)=>a.uid===firebaseUid?-1:b.uid===firebaseUid?1:String(a.username).localeCompare(String(b.username),'es'));
     if(!users.length){el.innerHTML='<div class="social-note">Nadie aparece conectado todavía.</div>';return;}
     el.innerHTML=`<div class="online-count">🟢 ${users.length} ${users.length===1?'persona':'personas'} conectadas</div>`+users.map(u=>`<div class="online-user"><span class="online-avatar">${u.uid===firebaseUid?'⭐':'👤'}</span><div><strong>${escapeHtml(u.username)}</strong><small>${u.uid===firebaseUid?'Eres tú':'Conectado ahora'}</small></div><span class="online-status">●</span></div>`).join('');
@@ -797,6 +839,7 @@ async function initFirebaseSync(){
       applyingRemote=false;
       render();renderRoomItems();
     }
+    markUserSyncCurrent();
     const gameSnap=await gameRef.get();
     if(!gameSnap.exists){
       await gameRef.set({mood:state.mood,hunger:state.hunger,energy:state.energy,health:state.health,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
