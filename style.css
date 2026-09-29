@@ -1114,3 +1114,16 @@ html.mobile-console-mode, html.mobile-console-mode body{overflow-x:hidden;}
 .install-help-close{position:absolute;right:8px;top:7px;width:34px;height:34px;border:2px solid #654f68;border-radius:8px;background:#3b2940;color:#fff;font-size:24px;line-height:1;}
 .install-help-ok{margin-top:14px;width:100%;}
 @media(max-width:560px){.pwa-install-button{width:132px}.pwa-help-button{width:36px;height:36px;font-size:15px}.pwa-install-hint{font-size:7px}.install-help-box{padding:18px 13px 14px}.install-help-box h2{font-size:12px}.install-help-box p{font-size:19px}.install-help-steps{font-size:17px}}
+
+/* ==========================================================
+   V46 — PERSONALIDAD DE IAHN
+   ========================================================== */
+.iahn.personality-face{cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none;}
+.sprite-wrap.iahn-leaving{animation:iahnLeave .65s cubic-bezier(.2,.75,.25,1) forwards;pointer-events:none;}
+.sprite-wrap.iahn-returning{animation:iahnReturn .7s cubic-bezier(.2,.8,.2,1) forwards;}
+@keyframes iahnLeave{0%{transform:translateX(0) rotate(0) scale(1);opacity:1}45%{transform:translateX(55px) rotate(3deg) scale(.98);opacity:1}100%{transform:translateX(430px) rotate(7deg) scale(.92);opacity:0}}
+@keyframes iahnReturn{0%{transform:translateX(-430px) rotate(-7deg) scale(.92);opacity:0}55%{transform:translateX(18px) rotate(1deg) scale(1.02);opacity:1}100%{transform:translateX(0) rotate(0) scale(1);opacity:1}}
+@media(max-width:560px){
+  @keyframes iahnLeave{0%{transform:translateX(0) rotate(0) scale(1);opacity:1}45%{transform:translateX(35px) rotate(3deg) scale(.98);opacity:1}100%{transform:translateX(260px) rotate(7deg) scale(.92);opacity:0}}
+  @keyframes iahnReturn{0%{transform:translateX(-260px) rotate(-7deg) scale(.92);opacity:0}55%{transform:translateX(12px) rotate(1deg) scale(1.02);opacity:1}100%{transform:translateX(0) rotate(0) scale(1);opacity:1}}
+}
