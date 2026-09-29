@@ -590,10 +590,52 @@ function miniGame(type){
   }
 }
 
-function chatMenu(){body.innerHTML=`<p><strong>Actividad de Iahn</strong></p><div class="feed">${state.feed.slice().reverse().map(f=>`<div class="feed-item"><img class="thumb" src="${f.src}" alt=""><div><strong>${f.user}</strong><br>${f.text}</div></div>`).join('')||'<div class="feed-item">Todavía no hay actividad.</div>'}</div>`}
+async function chatMenu(friendUid=null, friendName=''){
+  if(!firebaseReady){body.innerHTML='<div class="feed-item">🔴 Firebase no está conectado todavía.</div><p><small>Recarga la página e inténtalo de nuevo.</small></p>';return;}
+  const friends=await getFriends();
+  if(!friends.length){
+    body.innerHTML='<div class="feed-item">👥 Todavía no tienes amigos.</div><p><small>Ve a 👥 Amigos para buscar a alguien por su nombre de usuario.</small></p>';return;
+  }
+  const selected=friendUid?friends.find(f=>f.uid===friendUid):friends[0];
+  if(!selected){friendUid=friends[0].uid;friendName=friends[0].username;}
+  friendUid=friendUid||selected.uid; friendName=friendName||selected.username;
+  const list=friends.map(f=>`<button class="menu-item chat-friend-select ${f.uid===friendUid?'selected':''}" data-chat-uid="${escapeHtml(f.uid)}" data-chat-name="${escapeHtml(f.username)}"><span class="emoji">💬</span>${escapeHtml(f.username)}<small>Abrir chat</small></button>`).join('');
+  body.innerHTML=`<div class="chat-layout"><div class="chat-friends"><strong>AMIGOS</strong><div class="chat-friend-list">${list}</div></div><div class="chat-panel"><div class="chat-title">💬 ${escapeHtml(friendName)}</div><div id="chatMessages" class="chat-messages"><div class="feed-item">Cargando mensajes...</div></div><form id="chatForm" class="chat-form"><input id="chatInput" maxlength=300 autocomplete="off" placeholder="Escribe un mensaje..." required><button class="primary" type="submit">➤</button></form></div></div>`;
+  body.querySelectorAll('[data-chat-uid]').forEach(b=>b.addEventListener('click',()=>chatMenu(b.dataset.chatUid,b.dataset.chatName)));
+  const form=$('#chatForm'), input=$('#chatInput');
+  form.addEventListener('submit',async e=>{e.preventDefault();const text=String(input.value||'').trim();if(!text)return;input.disabled=true;try{await sendChatMessage(friendUid,text);input.value='';}catch(err){console.warn(err);toast('No se pudo enviar el mensaje.');}input.disabled=false;input.focus();});
+  subscribeToChat(friendUid);
+}
 function galleryMenu(){body.innerHTML=`<p>Fotos desbloqueadas: ${state.photos.length}</p><div class="gallery">${state.photos.map((src,i)=>`<img src="${src}" alt="Recuerdo ${i+1}">`).join('')||'<p>Aún no hay fotos.</p>'}</div>`}
 function achievementsMenu(){const a=[['🍕','Primera comida',state.hunger>62],['😂','Primer meme',state.photos.length>0],['⭐','100 puntos',state.points>=100],['🫂','Cariño recibido',state.mood>78],['🎮','Jugar',state.points>0]];body.innerHTML=a.map(x=>`<div class="feed-item"><span style="font-size:26px">${x[0]}</span><div><strong>${x[1]}</strong><br><small>${x[2]?'✓ Desbloqueado':'🔒 Bloqueado'}</small></div></div>`).join('')}
-function friendsMenu(){body.innerHTML=`<div class="feed"><div class="feed-item">🟢 <strong>Tú</strong><small> cuidando a Iahn</small></div><div class="feed-item">🟢 <strong>Pablo</strong><small> jugando</small></div><div class="feed-item">⚪ <strong>Marta</strong><small> hace 2 h</small></div><div class="feed-item">⚪ <strong>Jorge</strong><small> desconectado</small></div></div><p><small>Amigos provisionales. Más adelante estarán conectados de verdad.</small></p>`}
+async function friendsMenu(){
+  if(!firebaseReady){body.innerHTML='<div class="feed-item">🔴 Firebase no está conectado.</div>';return;}
+  const [friends,incoming,outgoing]=await Promise.all([getFriends(),getFriendRequests('incoming'),getFriendRequests('outgoing')]);
+  const friendIds=new Set(friends.map(f=>f.uid));
+  const incomingHtml=incoming.map(r=>`<div class="friend-row"><div><strong>👤 ${escapeHtml(r.fromName||'Usuario')}</strong><small> quiere ser tu amigo</small></div><div class="friend-actions"><button class="primary mini" data-accept="${escapeHtml(r.id)}">ACEPTAR</button><button class="secondary mini" data-reject="${escapeHtml(r.id)}">RECHAZAR</button></div></div>`).join('')||'<div class="feed-item">No tienes solicitudes nuevas.</div>';
+  const outgoingHtml=outgoing.map(r=>`<div class="friend-row"><div><strong>📨 ${escapeHtml(r.toName||'Usuario')}</strong><small> solicitud enviada</small></div><span>⏳</span></div>`).join('')||'<div class="feed-item">No tienes solicitudes pendientes.</div>';
+  const friendsHtml=friends.map(f=>`<div class="friend-row"><div><strong>🟢 ${escapeHtml(f.username)}</strong><small> amigo</small></div><button class="primary mini" data-open-chat="${escapeHtml(f.uid)}" data-open-chat-name="${escapeHtml(f.username)}">CHAT</button></div>`).join('')||'<div class="feed-item">Todavía no tienes amigos.</div>';
+  body.innerHTML=`<div class="friends-wrap"><div class="friend-search"><strong>👥 AÑADIR AMIGO</strong><form id="friendSearchForm"><input id="friendSearchInput" maxlength=20 placeholder="Nombre de usuario..." autocomplete="off"><button class="primary" type="submit">BUSCAR</button></form><div id="friendSearchResult"></div></div><h3 class="social-heading">👥 MIS AMIGOS (${friends.length})</h3><div class="friends-list">${friendsHtml}</div><h3 class="social-heading">📥 SOLICITUDES</h3>${incomingHtml}<h3 class="social-heading">📨 ENVIADAS</h3>${outgoingHtml}</div>`;
+  $('#friendSearchForm').addEventListener('submit',async e=>{e.preventDefault();await searchAndRenderFriend();});
+  body.querySelectorAll('[data-accept]').forEach(b=>b.addEventListener('click',async()=>{await acceptFriendRequest(b.dataset.accept);await friendsMenu();}));
+  body.querySelectorAll('[data-reject]').forEach(b=>b.addEventListener('click',async()=>{await rejectFriendRequest(b.dataset.reject);await friendsMenu();}));
+  body.querySelectorAll('[data-open-chat]').forEach(b=>b.addEventListener('click',()=>chatMenu(b.dataset.openChat,b.dataset.openChatName)));
+}
+async function searchAndRenderFriend(){
+  const input=$('#friendSearchInput'), result=$('#friendSearchResult');
+  const name=String(input?.value||'').trim(); if(!name){result.innerHTML='<div class="social-note">Escribe un nombre.</div>';return;}
+  const normalized=normalizeUsername(name); result.innerHTML='<div class="social-note">Buscando...</div>';
+  try{
+    const snap=await firebaseDb.collection('usernames').doc(normalized).get();
+    if(!snap.exists){result.innerHTML='<div class="social-note">❌ No existe ningún usuario con ese nombre.</div>';return;}
+    const d=snap.data()||{}; if(d.uid===firebaseUid){result.innerHTML='<div class="social-note">😅 Ese eres tú.</div>';return;}
+    const existing=await getFriendshipBetween(firebaseUid,d.uid); if(existing){result.innerHTML='<div class="social-note">✅ Ya sois amigos.</div>';return;}
+    const pending=await getPendingBetween(firebaseUid,d.uid); if(pending){result.innerHTML=`<div class="social-note">⏳ Ya hay una solicitud pendiente.</div>`;return;}
+    result.innerHTML=`<div class="friend-search-result"><strong>👤 ${escapeHtml(d.username||name)}</strong><button class="primary mini" id="sendFriendBtn">AÑADIR</button></div>`;
+    $('#sendFriendBtn').addEventListener('click',async()=>{try{await sendFriendRequest(d.uid,d.username||name);result.innerHTML='<div class="social-note">✅ Solicitud enviada.</div>';}catch(e){console.warn(e);result.innerHTML='<div class="social-note">❌ No se pudo enviar.</div>';}});
+  }catch(e){console.warn(e);result.innerHTML='<div class="social-note">❌ Error al buscar.</div>';}
+}
+
 function homeMenu(){body.innerHTML=`<p>Prototipo local de Iahn. Las fotos y puntos se guardan en este navegador.</p><button class="primary" id="reset" type="button">Reiniciar partida</button>`;$('#reset').addEventListener('click',()=>{localStorage.clear();location.reload()})}
 
 
@@ -648,6 +690,84 @@ async function syncGlobalDelta(delta){
     await firebaseDb.collection('game').doc('iahn').set({updatedAt:firebase.firestore.FieldValue.serverTimestamp(),...patch},{merge:true});
   }catch(e){console.warn('Firebase global sync:',e)}
 }
+
+// ==========================================================
+// AMIGOS + CHAT — FIRESTORE EN TIEMPO REAL
+// ==========================================================
+let chatUnsubscribe=null;
+function escapeHtml(v){return String(v??'').replace(/[&<>\"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[ch]));}
+function normalizeUsername(v){return String(v||'').trim().toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9._-]/g,'').slice(0,20);}
+function chatIdFor(a,b){return [a,b].sort().join('__');}
+function friendshipIdFor(a,b){return chatIdFor(a,b);}
+async function registerUsernameIndex(){
+  if(!firebaseReady||!firebaseUid||!state.username)return;
+  const key=normalizeUsername(state.username); if(!key)return;
+  const ref=firebaseDb.collection('usernames').doc(key);
+  const snap=await ref.get();
+  if(!snap.exists){await ref.set({uid:firebaseUid,username:state.username,createdAt:firebase.firestore.FieldValue.serverTimestamp()});return true;}
+  const d=snap.data()||{};
+  if(d.uid===firebaseUid)return true;
+  console.warn('Nombre de usuario ocupado:',state.username);return false;
+}
+async function getFriends(){
+  if(!firebaseReady||!firebaseUid)return [];
+  const snap=await firebaseDb.collection('friendships').where('users','array-contains',firebaseUid).get();
+  const out=[];
+  for(const doc of snap.docs){const d=doc.data()||{};const other=(d.users||[]).find(x=>x!==firebaseUid);if(!other)continue;const names=d.names||{};out.push({uid:other,username:names[other]||'Usuario'});}
+  return out;
+}
+async function getFriendshipBetween(a,b){const doc=await firebaseDb.collection('friendships').doc(friendshipIdFor(a,b)).get();return doc.exists?doc:null;}
+async function getPendingBetween(a,b){
+  const [ab,ba]=await Promise.all([
+    firebaseDb.collection('friendRequests').where('fromUid','==',a).get(),
+    firebaseDb.collection('friendRequests').where('fromUid','==',b).get()
+  ]);
+  const aReq=ab.docs.find(d=>{const x=d.data()||{};return x.toUid===b&&x.status==='pending';});
+  const bReq=ba.docs.find(d=>{const x=d.data()||{};return x.toUid===a&&x.status==='pending';});
+  return aReq||bReq||null;
+}
+async function getFriendRequests(direction){
+  if(!firebaseReady||!firebaseUid)return [];
+  const field=direction==='incoming'?'toUid':'fromUid';
+  const snap=await firebaseDb.collection('friendRequests').where(field,'==',firebaseUid).get();
+  return snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.status==='pending');
+}
+async function sendFriendRequest(toUid,toName){
+  if(toUid===firebaseUid)throw new Error('self');
+  if(await getFriendshipBetween(firebaseUid,toUid))throw new Error('already-friends');
+  if(await getPendingBetween(firebaseUid,toUid))throw new Error('pending');
+  await firebaseDb.collection('friendRequests').add({fromUid:firebaseUid,fromName:state.username||'Usuario',toUid,toName,status:'pending',createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+}
+async function acceptFriendRequest(id){
+  const ref=firebaseDb.collection('friendRequests').doc(id), snap=await ref.get(); if(!snap.exists)throw new Error('missing');
+  const d=snap.data()||{}; if(d.toUid!==firebaseUid)throw new Error('not-authorized');
+  const batch=firebaseDb.batch();
+  batch.set(firebaseDb.collection('friendships').doc(friendshipIdFor(d.fromUid,d.toUid)),{users:[d.fromUid,d.toUid],names:{[d.fromUid]:d.fromName||'Usuario',[d.toUid]:d.toName||state.username||'Usuario'},createdAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+  batch.update(ref,{status:'accepted',acceptedAt:firebase.firestore.FieldValue.serverTimestamp()});
+  await batch.commit();
+}
+async function rejectFriendRequest(id){const ref=firebaseDb.collection('friendRequests').doc(id),snap=await ref.get();if(!snap.exists)throw new Error('missing');const d=snap.data()||{};if(d.toUid!==firebaseUid)throw new Error('not-authorized');await ref.update({status:'rejected',rejectedAt:firebase.firestore.FieldValue.serverTimestamp()});}
+async function sendChatMessage(friendUid,text){
+  if(!firebaseReady||!firebaseUid)throw new Error('not-ready');
+  const friendship=await getFriendshipBetween(firebaseUid,friendUid);if(!friendship)throw new Error('not-friends');
+  const chatRef=firebaseDb.collection('chats').doc(chatIdFor(firebaseUid,friendUid));
+  const clean=text.trim().slice(0,300); if(!clean)return;
+  const batch=firebaseDb.batch();
+  batch.set(chatRef,{participants:[firebaseUid,friendUid],lastMessage:clean,lastSender:firebaseUid,lastSenderName:state.username||'Usuario',updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+  batch.set(chatRef.collection('messages').doc(),{senderUid:firebaseUid,senderName:state.username||'Usuario',text:clean,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+  await batch.commit();
+}
+function subscribeToChat(friendUid){
+  if(chatUnsubscribe){chatUnsubscribe();chatUnsubscribe=null;}
+  if(!firebaseReady||!firebaseUid)return;
+  const chatRef=firebaseDb.collection('chats').doc(chatIdFor(firebaseUid,friendUid));
+  chatUnsubscribe=chatRef.collection('messages').orderBy('createdAt','asc').limitToLast(100).onSnapshot(snap=>{
+    const el=$('#chatMessages');if(!el)return;
+    if(snap.empty){el.innerHTML='<div class="social-note">No hay mensajes todavía. ¡Di hola! 👋</div>';return;}
+    el.innerHTML=snap.docs.map(d=>{const m=d.data()||{};const mine=m.senderUid===firebaseUid;return `<div class="chat-bubble ${mine?'mine':''}"><strong>${escapeHtml(m.senderName||'Usuario')}</strong><span>${escapeHtml(m.text||'')}</span><small>${m.createdAt?.toDate?m.createdAt.toDate().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):''}</small></div>`}).join('');
+    el.scrollTop=el.scrollHeight;
+  },e=>{console.warn('Chat listener:',e);const el=$('#chatMessages');if(el)el.innerHTML='<div class="social-note">❌ No se pudieron cargar los mensajes.</div>';});
+}
 async function initFirebaseSync(){
   if(!hasFirebaseConfig())return;
   try{
@@ -692,6 +812,7 @@ async function initFirebaseSync(){
       applyingRemote=false;
       render();
     });
+    if(state.username) await registerUsernameIndex().catch(e=>console.warn('Username index:',e));
     console.info('Firebase conectado. Usuario:',firebaseUid);
   }catch(e){
     firebaseReady=false;
@@ -707,6 +828,9 @@ async function saveUsername(username){
   if(firebaseReady && firebaseUid){
     try{
       await firebaseDb.collection('users').doc(firebaseUid).set({username:clean,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      const key=normalizeUsername(clean); const ref=firebaseDb.collection('usernames').doc(key); const snap=await ref.get();
+      if(snap.exists && snap.data()?.uid!==firebaseUid){state.username=localStorage.getItem('iahnUsername')||'';throw new Error('username-taken');}
+      await ref.set({uid:firebaseUid,username:clean,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
     }catch(e){
       console.warn('Firebase username save:',e);
       return false;
