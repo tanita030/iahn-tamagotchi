@@ -761,6 +761,26 @@ function renderOnlineUsers(){
   },e=>{console.warn('Presence listener:',e);el.innerHTML='<div class="social-note">❌ No se pudo cargar la lista.</div>';});
 }
 
+async function registerUsernameIndex(){
+  if(!firebaseReady || !firebaseUid || !state.username) return;
+  const clean=String(state.username).trim().replace(/\s+/g,' ');
+  const key=normalizeUsername(clean);
+  if(!key) return;
+  const ref=firebaseDb.collection('usernames').doc(key);
+  const snap=await ref.get();
+  if(snap.exists){
+    const data=snap.data()||{};
+    if(data.uid && data.uid !== firebaseUid){
+      throw new Error('username-taken');
+    }
+  }
+  await ref.set({
+    uid: firebaseUid,
+    username: clean,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }, {merge:true});
+}
+
 async function initFirebaseSync(){
   if(!hasFirebaseConfig())return;
   try{
