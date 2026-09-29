@@ -716,14 +716,21 @@ async function getFriends(){
   for(const doc of snap.docs){const d=doc.data()||{};const other=(d.users||[]).find(x=>x!==firebaseUid);if(!other)continue;const names=d.names||{};out.push({uid:other,username:names[other]||'Usuario'});}
   return out;
 }
-async function getFriendshipBetween(a,b){const doc=await firebaseDb.collection('friendships').doc(friendshipIdFor(a,b)).get();return doc.exists?doc:null;}
+async function getFriendshipBetween(a,b){
+  if(!firebaseReady||!firebaseUid)return null;
+  // La consulta usa el índice de amistades del usuario actual. Así no intentamos
+  // leer directamente un documento inexistente, algo que las reglas pueden rechazar.
+  const snap=await firebaseDb.collection('friendships').where('users','array-contains',firebaseUid).get();
+  return snap.docs.find(d=>{const users=d.data()?.users||[];return users.includes(a)&&users.includes(b)})||null;
+}
 async function getPendingBetween(a,b){
-  const [ab,ba]=await Promise.all([
+  // Solo consultamos solicitudes que el usuario actual puede leer según las reglas.
+  const [outgoing,incoming]=await Promise.all([
     firebaseDb.collection('friendRequests').where('fromUid','==',a).get(),
-    firebaseDb.collection('friendRequests').where('fromUid','==',b).get()
+    firebaseDb.collection('friendRequests').where('toUid','==',a).get()
   ]);
-  const aReq=ab.docs.find(d=>{const x=d.data()||{};return x.toUid===b&&x.status==='pending';});
-  const bReq=ba.docs.find(d=>{const x=d.data()||{};return x.toUid===a&&x.status==='pending';});
+  const aReq=outgoing.docs.find(d=>{const x=d.data()||{};return x.toUid===b&&x.status==='pending';});
+  const bReq=incoming.docs.find(d=>{const x=d.data()||{};return x.fromUid===b&&x.status==='pending';});
   return aReq||bReq||null;
 }
 async function getFriendRequests(direction){
