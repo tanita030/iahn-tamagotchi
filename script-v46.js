@@ -134,7 +134,7 @@ const ROOM_ITEMS={
   books:{name:'Libros',emoji:'📚',cost:35,file:'11_libros.png',x:290,y:500,w:190,h:163,z:14},
   drink:{name:'Bebida',emoji:'🥤',cost:20,file:'12_bebida.png',x:1508,y:310,w:88,h:164,z:15},
   hangingPlant:{name:'Planta colgante',emoji:'🌿',cost:65,file:'13_planta_colgante.png',x:1372,y:5,w:218,h:258,z:11},
-  plant:{name:'Planta',emoji:'🪴',cost:40,file:'14_planta_maceta.png',x:10,y:708,w:200,h:232,z:5},
+  plant:{name:'Planta',emoji:'🪴',cost:40,file:'14_planta_maceta.png',x:10,y:708,w:200,h:232,z:11},
   mugPlant:{name:'Taza con planta',emoji:'☕',cost:45,file:'15_taza_planta.png',x:1362,y:265,w:150,h:202,z:13},
   cabinet:{name:'Mueble',emoji:'🗄️',cost:90,file:'16_mueble.png',x:1350,y:420,w:300,h:300,z:10},
   blinds:{name:'Veneciana',emoji:'🪟',cost:60,file:'17_veneciana.png',x:946,y:0,w:244,h:230,z:14},
