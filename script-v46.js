@@ -223,6 +223,18 @@ function careMenu(){
   body.innerHTML=`<div class="menu-grid">${options.map(o=>`<button class="menu-item care-choice" data-k="${o[2]}" data-v="${o[3]}" data-name="${o[1]}" data-face="${o[4]}"><span class="emoji">${o[0]}</span>${o[1]}<small>+${o[3]}</small></button>`).join('')}</div>`;
   body.querySelectorAll('.care-choice').forEach(b=>b.addEventListener('click',()=>{
     const name=b.dataset.name, face=b.dataset.face;
+    if(name==='Hablar de alguna gilipollez'){
+      if(!spend(cost))return;
+      const intros=['A ver, tengo una cosa que decir.','Bro, escucha esto.','Estaba pensando una gilipollez.','Mira, te voy a contar una movida.','No sé por qué estoy pensando en esto ahora.','Tengo una teoría bastante absurda.'];
+      const intro=intros[Math.floor(Math.random()*intros.length)];
+      const special=pickSpecialPhrase();
+      change({mood:v});
+      personalityVisual('thinking',intro,'anim-pop',['💬']);
+      setTimeout(()=>{ if(!iahnAway){ personalityVisual('cool',special,'anim-pop',['💬','✨']); logActivity('iahn',special,'💬'); } },700);
+      toast('Iahn se ha puesto a hablar de una gilipollez · -'+cost+' ⭐');
+      closeModal();
+      return;
+    }
     if(face==='sleep'){
       if(sleepTimer) clearTimeout(sleepTimer);
       change({energy:15}); state.points+=2; render();
@@ -626,6 +638,7 @@ function homeMenu(){body.innerHTML=`<p>Prototipo local de Iahn. Las fotos y punt
    ========================================================== */
 const GAME_COSTS={
   meme:3,
+  talk:4,
   hug:3, call:5, visit:8, movie:6, music:4, cat:2, joke:1
 };
 const FOOD_DATA=[
@@ -969,13 +982,29 @@ function foodMenu(){
 
 function careMenu(){
   const options=[
-    ['🫂','Abrazar',GAME_COSTS.hug,15,'love'],['📞','Llamar',GAME_COSTS.call,12,'phone'],['🧑‍🤝‍🧑','Visitar',GAME_COSTS.visit,20,'happy'],
-    ['🎬','Ver una peli',GAME_COSTS.movie,12,'happy'],['🎧','Ponerle música',GAME_COSTS.music,10,'music'],
-    ['🛏️','Dejarle descansar',0,25,'sleep'],['🐱','Acariciar gato',GAME_COSTS.cat,10,'cat'],['💩','Hacer el gilipollas',GAME_COSTS.joke,8,'laugh']
+    ['💬','Hablar de alguna gilipollez',GAME_COSTS.talk,7,'thinking','A ver, tengo una cosa.'],
+    ['🫂','Abrazar',GAME_COSTS.hug,15,'love','Vale, abrazo y ya.'],
+    ['📞','Llamadita Discord',GAME_COSTS.call,12,'phone','A ver qué se cuenta la gente.'],
+    ['🧑‍🤝‍🧑','Visitar',GAME_COSTS.visit,20,'happy','Plan de visita.'],
+    ['🎬','Ver una peli',GAME_COSTS.movie,12,'happy','Ponemos algo y tiramos.'],
+    ['🎧','Poner música',GAME_COSTS.music,10,'music','Pon algo decente.'],
+    ['🌿','Echarse un free',8,8,'relaxed','Un rato de tranqui.'],
+    ['🎮','Jugar a la Play',10,12,'cool','Una partida y vemos.'],
+    ['📖','Leer',7,8,'study','Voy a leer un rato.'],
+    ['📰','Hacer la revista',9,10,'writing','Hay que sacar esto adelante.'],
+    ['👕','Hacer outfit guapo',11,10,'cool','Este outfit sale bien.'],
+    ['🧥','Comprar chaquetas',18,12,'cool','A ver qué chaqueta cae.'],
+    ['🚶','Desfilar por la Rambla',14,14,'happy','Venga, paseo por la Rambla.'],
+    ['✍️','Escribir',7,9,'writing','Tengo que escribir una cosa.'],
+    ['🏋️','Ir al gym',12,12,'tired','Gym. Sin excusas.'],
+    ['🎨','Dibujar',8,9,'writing','Voy a dibujar algo.'],
+    ['🛏️','Dejarle descansar',0,25,'sleep','Cinco minutos y vuelvo.'],
+    ['🐱','Acariciar gato',GAME_COSTS.cat,10,'cat','El gato manda.'],
+    ['💩','Hacer el gilipollas',GAME_COSTS.joke,8,'laugh','No hace falta explicar esto.']
   ];
-  body.innerHTML=`<div class="shop-head"><span>⭐ ${state.points}</span><span>❤️ CARIÑO</span></div><p class="shop-note">Las acciones de cariño cuestan estrellas. Dormir y acariciar al gato tienen sus propias reglas.</p><div class="menu-grid">${options.map(o=>`<button class="menu-item care-choice" data-cost="${o[2]}" data-v="${o[3]}" data-name="${o[1]}" data-face="${o[4]}" ${state.points<o[2]?'disabled':''}><span class="emoji">${o[0]}</span><strong>${o[1]}</strong><small>${o[2]?'⭐ '+o[2]:'GRATIS'} · +${o[3]}</small></button>`).join('')}</div>`;
+  body.innerHTML=`<div class="shop-head"><span>⭐ ${state.points}</span><span>❤️ CARIÑO</span></div><p class="shop-note">Haz cosas con Iahn. Algunas cuestan estrellas.</p><div class="menu-grid">${options.map(o=>`<button class="menu-item care-choice" data-cost="${o[2]}" data-v="${o[3]}" data-name="${o[1]}" data-face="${o[4]}" data-line="${o[5]}" ${state.points<o[2]?'disabled':''}><span class="emoji">${o[0]}</span><strong>${o[1]}</strong><small>${o[2]?'⭐ '+o[2]:'GRATIS'} · +${o[3]}</small></button>`).join('')}</div>`;
   body.querySelectorAll('.care-choice').forEach(b=>b.addEventListener('click',()=>{
-    const name=b.dataset.name,face=b.dataset.face,cost=Number(b.dataset.cost),v=Number(b.dataset.v);
+    const name=b.dataset.name,face=b.dataset.face,cost=Number(b.dataset.cost),v=Number(b.dataset.v),line=b.dataset.line;
     if(face==='sleep'){
       if(sleepTimer){clearTimeout(sleepTimer);sleepTimer=null;}
       closeModal();
@@ -985,27 +1014,31 @@ function careMenu(){
       $('.room').classList.add('sleeping');
       change({energy:25,health:2,mood:2});
       toast('Iahn duerme 5 segundos... 🌙');
+      logActivity('action','se ha quedado durmiendo','💤');
       sleepTimer=setTimeout(()=>{
-        $('.room').classList.remove('sleeping');
-        stopSnore();
-        setFace('normal','Buenos días 😴','anim-pop',['✨']);
-        toast('¡Despierto! +25 energía ⚡');
-        sleepTimer=null;
+        $('.room').classList.remove('sleeping'); stopSnore(); setFace('normal','Ya estoy.','anim-pop',['✨']); toast('¡Despierto! +25 energía ⚡'); sleepTimer=null;
       },5000);
       return;
     }
     if(!spend(cost))return;
-    if(name==='Acariciar gato'){
-      petCat();
+    if(name==='Hablar de alguna gilipollez'){
+      const special=pickSpecialPhrase();
+      change({mood:v});
+      setFace('cool',special,'anim-pop',['💬','✨']);
+      logActivity('iahn',special,'💬');
+      toast('Iahn: '+special+' · -'+cost+' ⭐');
       closeModal();
       return;
     }
-    change({mood:v,energy: name==='Ver una peli'?2:0});
-    setFace(face,`${name} ❤️`,'anim-pop',['❤️','💕']);
-    toast(`${name}: -${cost} ⭐`);logActivity('action',`ha hecho: ${name}`,'❤️');closeModal();
+    if(name==='Acariciar gato'){petCat();closeModal();return;}
+    const energyBoost=['Jugar a la Play','Ir al gym','Desfilar por la Rambla','Echarse un free'].includes(name)?2:0;
+    change({mood:v,energy:energyBoost});
+    setFace(face,line,'anim-pop',['✨']);
+    toast(`${name}: -${cost} ⭐`);
+    logActivity('action',`ha hecho: ${name}`,'❤️');
+    closeModal();
   }));
 }
-
 function petCat(){
   if(!hasRoomItem('cat')){toast('Primero tienes que comprar el gato 🐱');return;}
   const wrap=$('#catCompanion');
@@ -1263,6 +1296,7 @@ if(usernameForm)usernameForm.addEventListener('submit',async e=>{
 
 document.addEventListener('click',e=>{const btn=e.target.closest('button');if(btn && btn.id!=='musicToggle' && btn.id!=='startButton')playSfx('click');});
 // ==========================================================
+// ==========================================================
 // V46 — PERSONALIDAD DE IAHN
 // ==========================================================
 let iahnPersonalityStarted=false;
@@ -1275,6 +1309,7 @@ let iahnReturnTimer=null;
 let iahnFaceBag=[];
 let iahnLastRandomFace='normal';
 let iahnLastActivityAt=0;
+let iahnLastSpecialPhrase='';
 
 const IAHN_FAVOURITE_FOODS=new Set([
   'Pizza','Sushi','Sushi roll','Nigiri','Onigiri','Ramen','Ramen miso',
@@ -1286,13 +1321,96 @@ const IAHN_DISLIKED_FOODS=new Set([
   'Zanahoria','Bebida energética','Refresco skull'
 ]);
 
+// Frases especiales del propio Iahn. Son poco frecuentes a propósito:
+// la personalidad cotidiana usa muchas más frases de interacción.
+const IAHN_SPECIAL_PHRASES=[
+  'Empiezo sho porque soy el local',
+  'Ergo…',
+  'Como venga el ser de luz le caneo',
+  'Os sabéis de la de: Se que me buscas cuando sales…',
+  'La Mire me miró ( o o ) y la sara me Saró (oh- oh-)',
+  'Ahí te pille una tormenta peos con la boca abierta',
+  'El rey de las métricas',
+  'Ella solo quiere plakito, sacar un 10 en practicum',
+  'Cuánto tiempo te has ahorrado para no decir -sor?',
+  'Rexona, Gol de Rabona, Maricona, Truñona, Lona',
+  'Vas a venir a ensuciar a India',
+  'Dani ni se te ocurra decir Motosierra',
+  'Ya he acabado el TV3, KFC, TDP, SAP, LOL',
+  'Que preferís edición Navidad',
+  'Bocata Lomo 7/365 😁',
+  'M o M e N t u M',
+  'Diyor',
+  'DeO - Ostia tu y la D donde está? Está ya buscando aparcamiento',
+  'Esto también está en la revista…',
+  'Uuuula pero, pero que se le ve todo el SACCO',
+  'Que tal un “martes con…” tranquilito y con las manos en los bolsillos',
+  'Bro no hay una puta mierda… (Urban con 1.200+ prendas)',
+  'Vamos a brainrotear un poco…',
+  'Yiiiii',
+  'Claro Raúl, claro que sé hacerte esa instrumental…',
+  'Sal Mahoraga y ayúdame en esta discusión',
+  'Ahí te peinen a peos',
+  'Si tienes un desamor, ya os ayudo yo!',
+  'Madremia vaya pelos llevo…',
+  'Hoy me voy a cenar un cojín',
+  'Ping pong con… Bachillerato',
+  'Podría dibujarte sin levantar el lápiz',
+  'Buenosimio',
+  'Cuca de llum',
+  'Me ando meando',
+  'Incubame los huevos',
+  'La mente caliente, como darle vueltas a Lorca',
+  'Oh,carla! NOT: no tocarla!O dar la nota, dar la nota o no darla',
+  'El espacio no encaja en cajas de calcio'
+];
+
+const IAHN_TAP_PHRASES=[
+  'Ah! Mi bazo',
+  'Aiiiiii',
+  'Paraaaaaa',
+  'Tioooo ¿Qué haces?',
+  'BroooOOOOO',
+  'Qué pesao eres.',
+  'Que siiiiiii',
+  'Tira, tira.',
+  '¿Todo bien en casa?',
+  'Tremendo.',
+];
+
+const IAHN_GENERAL_COMMENTS=[
+  '¿Qué hacemos?',
+  'Me estoy aburriendo.',
+  'Necesito entretenimiento.',
+  'Hay que hacer algo productivo... O no.',
+  'Tengo una idea regulera.',
+  'Estoy pensando...',
+  'Pon música.',
+  'Salimos pa la rambla?.',
+  'Puta revista.',
+  'Hoy toca hacer algo guapo.',
+  'Me apetece jugar a la Play.',
+  '¿Hacemos un outfit?',
+  'Tengo que dibujar algo.',
+  'Voy a escribir un rato.',
+  'Necesito ir al gym.',
+  'Me apetece una llamadita.',
+  '¿Echamos un free?',
+  'Hay que mirar chaquetas.',
+  'La Rambla nos espera.',
+  'Tengo un proyecto mental perfecto.',
+  'Ahora mismo estoy en modo sofá.',
+  'Tengo cero contexto.',
+  'Bueno, pues aquí estamos.'
+];
+
 const IAHN_RANDOM_SCENES={
   normal:["¿Qué pasa?",'anim-pop',[]], happy:["estoy bastante bien 😌",'anim-happy',['✨']],
   laugh:["JAJAJA",'anim-happy',['😂','😂']], love:["🥹❤️",'anim-pop',['❤️','💕']],
   angry:["no me rayes.",'anim-shake',['💢']], sad:["hoy estoy un poco pocho...",'anim-pop',['💧']],
   serious:["un momento. estoy pensando.",'anim-pop',['…']], bored:["me aburro.",'anim-shake',['💤']],
   sleep:["zzz... cinco minutos más.",'anim-pop',['💤','💤']], eat:["me está entrando hambre 🍕",'anim-bounce',['🍕']],
-  drink:["necesito algo de beber.",'anim-pop',['🥤']], music:["esta canción está bastante bien 🎧",'anim-happy',['🎵','🎵']],
+  drink:["necesito beber algo tio.",'anim-pop',['🥤']], music:["esta canción está top 🎧",'anim-happy',['🎵','🎵']],
   study:["no quiero estudiar.",'anim-shake',['📚']], thinking:["hmmm...",'anim-pop',['🤔']],
   hood:["modo encapuchado activado.",'anim-pop',['😎']], celebrate:["VAMOOOOOS",'anim-happy',['🎉','⭐','🎉']],
   cat:["¿dónde está el gato? 🐱",'anim-pop',['🐱','❤️']], confused:["¿qué está pasando?",'anim-shake',['❓']],
@@ -1302,6 +1420,14 @@ const IAHN_RANDOM_SCENES={
   surprised:["¿¡QUÉ!?",'anim-pop',['❗','❗']], relaxed:["qué paz.",'anim-pop',['✨']],
   stretch:["aaaaaah, qué pereza.",'anim-bounce',['💤']]
 };
+function currentIahnName(){return String(state.username||'humano').trim()||'humano';}
+function pickSpecialPhrase(){
+  let pool=IAHN_SPECIAL_PHRASES.filter(x=>x!==iahnLastSpecialPhrase);
+  if(!pool.length)pool=IAHN_SPECIAL_PHRASES.slice();
+  const phrase=pool[Math.floor(Math.random()*pool.length)]; iahnLastSpecialPhrase=phrase; return phrase;
+}
+function shouldUseSpecial(chance){return Math.random()<chance;}
+function pickGeneralPhrase(list=IAHN_TAP_PHRASES){return list[Math.floor(Math.random()*list.length)];}
 function personalitySpeech(text){const el=$('#speech');if(el)el.textContent=text;}
 function personalityVisual(key,phrase,anim='anim-pop',effects=[]){
   if(iahnAway)return; const img=$('#iahn'); if(!img)return;
@@ -1317,20 +1443,26 @@ function refillFaceBag(){
 }
 function randomPersonalityScene(){
   if(iahnAway||document.hidden||!iahnPersonalityStarted)return;
-  if(!iahnFaceBag.length)refillFaceBag(); const key=iahnFaceBag.shift(); iahnLastRandomFace=key;
-  const scene=IAHN_RANDOM_SCENES[key]||IAHN_RANDOM_SCENES.normal; personalityVisual(key,scene[0],scene[1],scene[2]);
-  if(key==='celebrate')playSfx('yay'); schedulePersonalityScene();
+  {
+    if(!iahnFaceBag.length)refillFaceBag(); const key=iahnFaceBag.shift(); iahnLastRandomFace=key;
+    const scene=IAHN_RANDOM_SCENES[key]||IAHN_RANDOM_SCENES.normal; personalityVisual(key,scene[0],scene[1],scene[2]);
+    if(key==='celebrate')playSfx('yay');
+  }
+  schedulePersonalityScene();
 }
 function schedulePersonalityScene(){clearTimeout(iahnRandomTimer);iahnRandomTimer=setTimeout(randomPersonalityScene,26000+Math.random()*42000);}
 function spontaneousComment(){
   if(iahnAway||document.hidden||!iahnPersonalityStarted)return;
   const options=[];
-  if(state.hunger<25)options.push(['eat','tengo HAMBRE.','anim-shake',['🍕']]);
-  if(state.energy<22)options.push(['tired','estoy reventado.','anim-shake',['💀']]);
-  if(state.mood<25)options.push(['sad','no estoy muy fino hoy...','anim-pop',['💧']]);
-  if(state.health<30)options.push(['nervous','creo que necesito cuidarme un poco.','anim-shake',['⚠️']]);
-  options.push(['phone','espera, estoy mirando una cosa.','anim-pop',['📱']],['bored','¿hacemos algo?','anim-shake',['❓']],['thinking','estaba pensando en una cosa.','anim-pop',['🤔']],['music','pon música.','anim-happy',['🎵']],['cool','😎','anim-pop',['✨']],['relaxed','qué tranquilidad.','anim-pop',['✨']]);
-  const chosen=options[Math.floor(Math.random()*options.length)]; personalityVisual(chosen[0],chosen[1],chosen[2],chosen[3]);
+  if(state.hunger<25)options.push(['eat',`${currentIahnName()}, tengo HAMBRE.`,'anim-shake',['🍕']]);
+  if(state.energy<22)options.push(['tired',`${currentIahnName()}, estoy reventao.`,'anim-shake',['💀']]);
+  if(state.mood<25)options.push(['sad',`${currentIahnName()}, no estoy muy fino hoy...`,'anim-pop',['💧']]);
+  if(state.health<30)options.push(['nervous',`${currentIahnName()}, creo que necesito cuidados intensivos.`,'anim-shake',['⚠️']]);
+  {
+    const normal=IAHN_GENERAL_COMMENTS[Math.floor(Math.random()*IAHN_GENERAL_COMMENTS.length)];
+    options.push(['phone',normal(currentIahnName()),'anim-pop',['💬']]);
+    const chosen=options[Math.floor(Math.random()*options.length)]; personalityVisual(chosen[0],chosen[1],chosen[2],chosen[3]);
+  }
   clearTimeout(iahnCommentTimer);iahnCommentTimer=setTimeout(spontaneousComment,50000+Math.random()*70000);
 }
 function personalityFoodReaction(name,healthGain=0){
@@ -1341,31 +1473,57 @@ function personalityFoodReaction(name,healthGain=0){
   else personalityVisual('eat',`ñam... ${name} 😋`,'anim-bounce',['🍽️']);
 }
 function tapIahn(){
-  if(iahnAway)return; iahnTapCount++; clearTimeout(iahnTapResetTimer); iahnTapResetTimer=setTimeout(()=>{iahnTapCount=0;},4200);
-  if(iahnTapCount===1){personalityVisual('love','jeje 🥰','anim-happy',['❤️']);change({mood:2});}
-  else if(iahnTapCount===2)personalityVisual('laugh','JAJA, vale 😂','anim-happy',['😂']);
-  else if(iahnTapCount===3)personalityVisual('confused','¿qué haces? 😂','anim-shake',['❓']);
-  else if(iahnTapCount===4)personalityVisual('grumpy','ehhh, para ya.','anim-shake',['💢']);
-  else if(iahnTapCount>=5)sendIahnAway();
+  if(iahnAway)return;
+  iahnTapCount++;
+  clearTimeout(iahnTapResetTimer);
+  iahnTapResetTimer=setTimeout(()=>{iahnTapCount=0;},4200);
+  const n=iahnTapCount;
+  if(n>=30){sendIahnAway();return;}
+  const special=false;
+  if(n<=10){
+    const phrase=special?pickSpecialPhrase():pickGeneralPhrase();
+    personalityVisual(n===1?'love':'laugh',phrase,n===1?'anim-happy':'anim-bounce',n===1?['✨']:['😂']);
+    if(special)logActivity('iahn',phrase,'💬');
+    if(n===1)change({mood:2});
+  }else if(n<=20){
+    const annoyed=[
+      'Vale, ya.', 'Me estás haciendo cosquillas.', 'Pesao.', 'Que estoy intentando estar tranquilo.',
+      '¿Vas a seguir?', 'Bro, relaja.', 'Esto empieza a cansar.', 'Un poquito de espacio, por favor.',
+      'Ya te he visto.', 'No hacía falta insistir tanto.'
+    ];
+    const phrase=special?pickSpecialPhrase():annoyed[Math.floor(Math.random()*annoyed.length)];
+    personalityVisual('grumpy',phrase,'anim-shake',['💢']);
+    if(special)logActivity('iahn',phrase,'💬');
+  }else{
+    const furious=[
+      'TE ESTÁS PASANDO.', 'Vale, ya me estoy enfadando.', 'De verdad, para.', 'No puedo más.',
+      '¿PERO QUÉ HACES?', 'Último aviso.', 'Me estás buscando.', 'Se acabó la broma.',
+      'A la próxima me voy.', 'Esto ya no tiene gracia.'
+    ];
+    const phrase=special?pickSpecialPhrase():furious[Math.floor(Math.random()*furious.length)];
+    personalityVisual('angry',phrase,'anim-shake',['💢','😡']);
+    if(special)logActivity('iahn',phrase,'💬');
+  }
 }
 function sendIahnAway(){
   if(iahnAway)return; iahnAway=true; iahnTapCount=0; const wrap=$('.sprite-wrap'); if(!wrap)return;
-  personalitySpeech('ME VOY. 😤');
+  personalitySpeech('¡BASTA YA! 😤 ¡ME PIRO!');
   const img=$('#iahn'); if(img){img.src=FACE+faces.angry;img.classList.remove('anim-bounce','anim-pop','anim-happy');img.classList.add('anim-shake');}
   wrap.classList.remove('iahn-returning'); wrap.classList.add('iahn-leaving'); clearTimeout(iahnReturnTimer);
-  iahnReturnTimer=setTimeout(()=>{wrap.classList.remove('iahn-leaving');wrap.classList.add('iahn-returning');iahnAway=false;personalityVisual('surprised','¿ya has terminado?','anim-pop',['❓']);setTimeout(()=>wrap.classList.remove('iahn-returning'),700);iahnReturnTimer=null;},5000);
+  iahnReturnTimer=setTimeout(()=>{wrap.classList.remove('iahn-leaving');wrap.classList.add('iahn-returning');iahnAway=false;personalityVisual('surprised',`${currentIahnName()}, ¿ya has terminado? 😑`,'anim-pop',['❓']);setTimeout(()=>wrap.classList.remove('iahn-returning'),700);iahnReturnTimer=null;},5000);
 }
 function personalityOnActivity(d){
   if(!iahnPersonalityStarted||iahnAway||!d)return; const now=Date.now(); if(now-iahnLastActivityAt<12000)return;
   const username=String(d.username||'Usuario').trim(); if(!username||username===state.username)return; const type=d.type||'action'; const text=String(d.text||'').toLowerCase(); let reaction=null;
-  if(type==='message'){if(Math.random()<0.28)reaction=['writing',`${username} está hablando 👀`,'anim-pop',['💬']];}
-  else if(type==='action'){
-    if(text.includes('comido')||text.includes('pizza'))reaction=['eat',`¿${username} está comiendo? 👀`,'anim-bounce',['🍕']];
-    else if(text.includes('jugado'))reaction=['cool',`${username} se ha puesto a jugar 😎`,'anim-happy',['🎮']];
-    else if(text.includes('logro'))reaction=['celebrate',`¡${username} ha conseguido un logro! 🎉`,'anim-happy',['🏆','✨']];
-    else if(text.includes('gato'))reaction=['cat',`${username} también quiere al gato 🐱`,'anim-pop',['🐱']];
-    else if(text.includes('entrado')||text.includes('entró'))reaction=['surprised',`oh, ha llegado ${username} 👀`,'anim-pop',['👀']];
-    else if(Math.random()<0.32)reaction=['thinking',`${username} ${d.text||'ha hecho algo'} 👀`,'anim-pop',['❓']];
+  if(type==='message'){
+    if(Math.random()<.30)reaction=['writing',Math.random()<.25?`${username}, te leo.`:'Estoy leyendo eso.','anim-pop',['💬']];
+  }else if(type==='action'){
+    if(text.includes('comido')||text.includes('pizza'))reaction=['eat',Math.random()<.25?`${username} está comiendo. Invita.`:'Eso tiene buena pinta.','anim-bounce',['🍕']];
+    else if(text.includes('jugado'))reaction=['cool',Math.random()<.25?`${username} se ha puesto a jugar.`:'Voy a jugar luego.','anim-happy',['🎮']];
+    else if(text.includes('logro'))reaction=['celebrate',Math.random()<.25?`${username} ha sacado un logro.`:'Bien jugado.','anim-happy',['🏆','✨']];
+    else if(text.includes('gato'))reaction=['cat','El gato está viviendo mejor que nosotros.','anim-pop',['🐱']];
+    else if(text.includes('entrado')||text.includes('entró'))reaction=['surprised',Math.random()<.30?`Ha llegado ${username}.`:'Bueno, ya somos más.','anim-pop',['👀']];
+    else if(Math.random()<.28)reaction=['thinking',(d.text||'Te he visto hacer algo.'),'anim-pop',['❓']];
   }
   if(reaction){iahnLastActivityAt=now;personalityVisual(reaction[0],reaction[1],reaction[2],reaction[3]);}
 }
@@ -1376,7 +1534,7 @@ function attachIahnTap(){
 }
 function startIahnPersonality(){
   if(iahnPersonalityStarted)return; iahnPersonalityStarted=true; window.__IAHN_PERSONALITY_READY=true; window.__IAHN_ACTIVITY_PRIMED=false; attachIahnTap();
-  clearTimeout(iahnRandomTimer);clearTimeout(iahnCommentTimer);iahnFaceBag=[]; personalityVisual('happy','¡por fin has venido! 😎','anim-happy',['✨']);
+  clearTimeout(iahnRandomTimer);clearTimeout(iahnCommentTimer);iahnFaceBag=[]; personalityVisual('happy',`¡por fin has venido, ${currentIahnName()}! 😎`,'anim-happy',['✨']);
   iahnRandomTimer=setTimeout(randomPersonalityScene,18000+Math.random()*15000); iahnCommentTimer=setTimeout(spontaneousComment,35000+Math.random()*30000);
   setTimeout(()=>{window.__IAHN_ACTIVITY_PRIMED=true;},3500);
 }
