@@ -861,7 +861,7 @@ h1{font-family:'Press Start 2P',monospace;font-size:25px;letter-spacing:1px}
 .room-item{position:absolute;object-fit:fill;image-rendering:pixelated;pointer-events:none;user-select:none;}
 .sprite-wrap{z-index:20;}
 .speech{z-index:25;}
-.cat-companion{z-index:18;}
+.cat-companion{z-index:21;}
 .nav-emoji{display:block;font-size:30px;line-height:1;filter:drop-shadow(2px 2px 0 #08070b);}
 .room-shop-card{min-height:120px!important;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;}
 .room-shop-img{width:100%;height:72px;object-fit:contain;image-rendering:pixelated;display:block;}
